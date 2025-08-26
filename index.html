@@ -95,10 +95,6 @@
         <div class="field"><label class="label">Nombre</label><input id="fname" placeholder="Nombre" /></div>
         <div class="field"><label class="label">Apellido</label><input id="lname" placeholder="Apellido" /></div>
       </div>
-      <div class="grid-2" style="margin-top:8px">
-        <div class="field"><label class="label">Alias (opcional)</label><input id="alias" placeholder="ej: tu.alias.banco" /></div>
-        <div class="field"><label class="label">CVU (opcional)</label><input id="cvu" placeholder="0000000000000000000000" /></div>
-      </div>
       <div class="spacer"></div>
       <div class="field">
         <label class="label">Números elegidos (máx 2 para promo)</label>
@@ -111,6 +107,20 @@
           <div id="total" class="title">$0</div>
         </div>
         <button id="confirmBtn" class="primary">Confirmar selección</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="card" style="background:#0b1526; border-color:#203047">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <div>
+            <div class="label">Datos de pago</div>
+            <div id="paymentAliasRow" class="muted">Alias: <span id="paymentAlias" class="kbd">—</span></div>
+            <div id="paymentCVURow" class="muted">CVU: <span id="paymentCVU" class="kbd">—</span></div>
+          </div>
+          <div class="row">
+            <button id="copyAliasBtn" class="pill">Copiar alias</button>
+            <button id="copyCVUBtn" class="pill">Copiar CVU</button>
+          </div>
+        </div>
       </div>
       <div class="spacer"></div>
       <div class="muted" id="paymentHint">Pagá por el medio acordado y avisanos. El admin puede marcar como “Pagado”.</div>
@@ -140,6 +150,11 @@
         <div class="field"><label class="label">1er Premio</label><input id="prize1" placeholder="Descripción" /></div>
         <div class="field"><label class="label">2do Premio</label><input id="prize2" placeholder="Descripción" /></div>
         <div class="field"><label class="label">3er Premio</label><input id="prize3" placeholder="Descripción" /></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="grid-2">
+        <div class="field"><label class="label">Alias para pagos (opcional)</label><input id="confPayAlias" placeholder="tu.alias.banco" /></div>
+        <div class="field"><label class="label">CVU para pagos (opcional)</label><input id="confPayCVU" placeholder="0000000000000000000000" /></div>
       </div>
       <div class="spacer"></div>
       <div class="row">
@@ -206,6 +221,8 @@ service cloud.firestore {
         price: 1000,
         promo2: 1500,
         prizes: { p1:"1er premio", p2:"2do premio", p3:"3er premio" },
+        payAlias: "",
+        payCVU: ""
       },
       isAdminUser: false,
       adminPanelVisible: false,
@@ -225,11 +242,15 @@ service cloud.firestore {
     const chosenWrap = $("#chosen");
     const totalEl = $("#total");
 
-    // Form participantes
+    // Participante
     const fname = $("#fname");
     const lname = $("#lname");
-    const alias = $("#alias");
-    const cvu = $("#cvu");
+
+    // Pago (UI pública)
+    const paymentAlias = $("#paymentAlias");
+    const paymentCVU = $("#paymentCVU");
+    const paymentAliasRow = $("#paymentAliasRow");
+    const paymentCVURow = $("#paymentCVURow");
 
     // ====== BOOTSTRAP ======
     bootstrap();
@@ -279,11 +300,17 @@ service cloud.firestore {
       $("#resetAll").addEventListener("click", resetAll);
       $("#runTests").addEventListener("click", runTests);
 
+      // Copiar alias/CVU
+      $("#copyAliasBtn").addEventListener("click", ()=>copyToClipboard(S.settings.payAlias||''));
+      $("#copyCVUBtn").addEventListener("click", ()=>copyToClipboard(S.settings.payCVU||''));
+
+      // Datos en vivo
       onSnapshot(doc(db, "raffle", "current"), (d)=>{
         if (d.exists()){
           S.settings = { ...S.settings, ...d.data() };
         }
         renderHeader();
+        renderPaymentInfo();
         renderGrid(grid);
         if (S.adminPanelVisible) renderGrid(adminNumbers, true);
       });
@@ -321,8 +348,6 @@ service cloud.firestore {
             status: "selected",
             fname: fname.value.trim(),
             lname: lname.value.trim(),
-            alias: alias.value.trim(),
-            cvu: cvu.value.trim(),
             paid: false,
             updatedAt: Date.now()
           }, { merge: true });
@@ -344,10 +369,10 @@ service cloud.firestore {
     async function onExportCSV(){
       try {
         const numbersSnap = await getDocs(collection(db, "raffle", "current", "numbers"));
-        const rows = [["number","status","fname","lname","alias","cvu","paid","updatedAt"]];
+        const rows = [["number","status","fname","lname","paid","updatedAt"]];
         numbersSnap.forEach(d=>{
           const x = d.data();
-          rows.push([x.number,x.status||"",x.fname||"",x.lname||"",x.alias||"",x.cvu||"",x.paid?"TRUE":"FALSE",x.updatedAt||""]);
+          rows.push([x.number,x.status||"",x.fname||"",x.lname||"",x.paid?"TRUE":"FALSE",x.updatedAt||""]);
         });
         const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
         const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
@@ -369,6 +394,15 @@ service cloud.firestore {
       $("#prize1").value = S.settings.prizes.p1;
       $("#prize2").value = S.settings.prizes.p2;
       $("#prize3").value = S.settings.prizes.p3;
+      $("#confPayAlias").value = S.settings.payAlias||"";
+      $("#confPayCVU").value = S.settings.payCVU||"";
+    }
+
+    function renderPaymentInfo(){
+      paymentAlias.textContent = S.settings.payAlias || '—';
+      paymentCVU.textContent = S.settings.payCVU || '—';
+      paymentAliasRow.style.display = S.settings.payAlias? 'block':'none';
+      paymentCVURow.style.display = S.settings.payCVU? 'block':'none';
     }
 
     async function saveSettings(){
@@ -383,6 +417,8 @@ service cloud.firestore {
         price: parseInt($("#confPrice").value)||S.settings.price,
         promo2: parseInt($("#confPromo").value)||S.settings.promo2,
         prizes: { p1: $("#prize1").value||"", p2: $("#prize2").value||"", p3: $("#prize3").value||"" },
+        payAlias: $("#confPayAlias").value||"",
+        payCVU: $("#confPayCVU").value||"",
       };
       try{
         await setDoc(doc(db, "raffle", "current"), newSettings, { merge:true });
@@ -403,7 +439,7 @@ service cloud.firestore {
         for (let i = S.settings.min; i <= S.settings.max; i++){
           const n = String(i).padStart(2,'0');
           const ref = doc(db, "raffle", "current", "numbers", n);
-          batch.set(ref, { number:n, status:"available", fname:"", lname:"", alias:"", cvu:"", paid:false, updatedAt: Date.now() }, { merge:true });
+          batch.set(ref, { number:n, status:"available", fname:"", lname:"", paid:false, updatedAt: Date.now() }, { merge:true });
         }
         await batch.commit();
         alert("Listo. Números reiniciados.");
@@ -477,7 +513,7 @@ service cloud.firestore {
       const ref = doc(db, "raffle", "current", "numbers", n);
       try{
         if (action === 'clear'){
-          await setDoc(ref, { number:n, status:'available', fname:'', lname:'', alias:'', cvu:'', paid:false, updatedAt: Date.now() }, { merge:true});
+          await setDoc(ref, { number:n, status:'available', fname:'', lname:'', paid:false, updatedAt: Date.now() }, { merge:true});
         } else if (['available','selected','paid'].includes(action)){
           await setDoc(ref, { number:n, status:action, updatedAt: Date.now() }, { merge:true});
         } else {
@@ -486,6 +522,19 @@ service cloud.firestore {
       }catch(e){
         alert("No se pudo actualizar el número: "+e.message);
       }
+    }
+
+    function copyToClipboard(text){
+      if (!text) { alert('No hay datos de pago configurados'); return; }
+      navigator.clipboard.writeText(text).then(()=>{
+        alert('Copiado al portapapeles');
+      }).catch(()=>{
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); alert('Copiado al portapapeles'); } catch(_) { alert('No se pudo copiar'); }
+        document.body.removeChild(ta);
+      });
     }
 
     // === PRUEBAS (unit tests simples) ===
@@ -501,8 +550,7 @@ service cloud.firestore {
       // Selección máx 2 (simulado)
       S.chosen.clear();
       S.chosen.add('00'); S.chosen.add('01');
-      const before = S.chosen.size;
-      if (before !== 2){ /* debería ser 2 */ }
+      const before = S.chosen.size; // 2
       assertEq('limit 2 promo', before, 2);
 
       const ok = results.filter(r=>r.ok).length;
@@ -510,6 +558,7 @@ service cloud.firestore {
       alert(`🧪 Pruebas: ${ok}/${total} OK`);
       console.table(results.map(r=>({test:r.name, ok:r.ok, got:r.got, want:r.want})));
     }
+
   </script>
 
   <!-- Firestore reglas sugeridas (cópialas en Firebase → Firestore → Rules):
@@ -523,3 +572,4 @@ service cloud.firestore {
   -->
 </body>
 </html>
+
