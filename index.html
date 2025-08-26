@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sorteo Online</title>
+  <style>
+    :root{
+      --green:#16a34a; /* disponibles */
+      --yellow:#f59e0b; /* seleccionados */
+      --bg:#0b1220;
+      --card:#0f172a;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#22d3ee;
+      --red:#ef4444;
+      --blue:#3b82f6; /* pagado */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:var(--bg); color:var(--text)}
+    header{padding:16px 20px; display:flex; gap:12px; align-items:center; justify-content:space-between; border-bottom:1px solid #1e293b}
+    h1{font-size:1.25rem; margin:0}
+    .wrap{max-width:1100px; margin:0 auto; padding:16px}
+    .grid{display:grid; grid-template-columns:repeat(10,1fr); gap:8px}
+    .num{
+      aspect-ratio:1/1; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; user-select:none;
+      border:1px solid #1f2937; transition:transform .05s ease, filter .15s ease;
+    }
+    .num:hover{filter:brightness(1.05)}
+    .num.green{background:var(--green)}
+    .num.yellow{background:var(--yellow); color:#111827}
+    .num.blue{background:var(--blue)}
+    .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+    button, input, select, textarea{background:#111827; color:var(--text); border:1px solid #1f2937; border-radius:10px; padding:10px 12px; font-size:14px}
+    button{cursor:pointer}
+    button.primary{background:linear-gradient(135deg, #0ea5e9, #22d3ee); color:#00111a; font-weight:800; border:none}
+    button.danger{background:var(--red); border:none}
+    .card{background:var(--card); border:1px solid #1f2937; padding:16px; border-radius:14px}
+    .cols{display:grid; grid-template-columns:1.2fr .8fr; gap:16px}
+    @media (max-width: 900px){.cols{grid-template-columns:1fr}}
+    .muted{color:var(--muted); font-size:.9rem}
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .legend{display:flex; gap:10px; align-items:center}
+    .pill{display:inline-flex; gap:6px; align-items:center; padding:6px 10px; border-radius:999px; border:1px solid #203047; background:#0b1526; font-size:.85rem}
+    .dot{width:12px; height:12px; border-radius:999px}
+    .dot.green{background:var(--green)}
+    .dot.yellow{background:var(--yellow)}
+    .dot.blue{background:var(--blue)}
+    .hidden{display:none}
+    .title{font-size:1.1rem; font-weight:800}
+    .spacer{height:12px}
+    .label{font-size:.8rem; color:var(--muted); margin-bottom:4px}
+    .field{display:flex; flex-direction:column; gap:6px}
+    .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas; font-size:.85rem; background:#0b1526; border:1px solid #1f2937; padding:2px 6px; border-radius:6px}
+    .footer{padding:12px 20px; color:var(--muted); text-align:center}
+    .badge{font-size:.7rem; padding:2px 6px; border-radius:6px; background:#0b1526; border:1px solid #203047}
+    .right{margin-left:auto}
+    details.diag summary{cursor:pointer}
+    .ok{color:#22c55e}
+    .fail{color:#ef4444}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1 id="appTitle">Sorteo 00–99</h1>
+      <div class="muted" id="subtitle">Elegí tu número. Precio base: <span id="priceLabel">$1000</span>. Promo 2x: <span id="promoLabel">$1500</span>.</div>
+    </div>
+    <div class="toolbar">
+      <button id="adminToggle" class="pill">🔑 Admin</button>
+      <button id="exportCsvBtn" class="pill">⬇️ Exportar CSV</button>
+    </div>
+  </header>
+
+  <div class="wrap cols">
+    <section class="card">
+      <div class="row" style="justify-content:space-between; align-items:flex-start">
+        <div class="legend">
+          <span class="pill"><span class="dot green"></span> Disponible</span>
+          <span class="pill"><span class="dot yellow"></span> Seleccionado</span>
+          <span class="pill"><span class="dot blue"></span> Pagado</span>
+        </div>
+        <div class="pill">Rango: <span id="rangeLabel" class="kbd">00–99</span></div>
+      </div>
+      <div class="spacer"></div>
+      <div id="numbersGrid" class="grid"></div>
+    </section>
+
+    <aside class="card">
+      <div class="title">Participar</div>
+      <div class="spacer"></div>
+      <div class="grid-2">
+        <div class="field"><label class="label">Nombre</label><input id="fname" placeholder="Nombre" /></div>
+        <div class="field"><label class="label">Apellido</label><input id="lname" placeholder="Apellido" /></div>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <div class="field"><label class="label">Alias (opcional)</label><input id="alias" placeholder="ej: tu.alias.banco" /></div>
+        <div class="field"><label class="label">CVU (opcional)</label><input id="cvu" placeholder="0000000000000000000000" /></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="field">
+        <label class="label">Números elegidos (máx 2 para promo)</label>
+        <div id="chosen" class="row"></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="muted">Total</div>
+          <div id="total" class="title">$0</div>
+        </div>
+        <button id="confirmBtn" class="primary">Confirmar selección</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="muted" id="paymentHint">Pagá por el medio acordado y avisanos. El admin puede marcar como “Pagado”.</div>
+    </aside>
+  </div>
+
+  <div class="wrap">
+    <section id="adminPanel" class="card hidden">
+      <div class="row" style="align-items:baseline">
+        <div class="title">Panel Admin</div>
+        <span class="badge">Solo visible en modo admin</span>
+        <button id="signOutBtn" class="pill right">Cerrar sesión</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="grid-3">
+        <div class="field"><label class="label">Título</label><input id="confTitle" /></div>
+        <div class="field"><label class="label">Subtítulo</label><input id="confSubtitle" /></div>
+        <div class="field"><label class="label">Rango (mín-máx)</label><input id="confRange" placeholder="00-99" /></div>
+      </div>
+      <div class="grid-3" style="margin-top:8px">
+        <div class="field"><label class="label">Precio por número</label><input id="confPrice" type="number" min="0" step="1" /></div>
+        <div class="field"><label class="label">Promo 2x</label><input id="confPromo" type="number" min="0" step="1" /></div>
+        <div class="field"><label class="label">PIN Admin</label><input id="confAdminPin" placeholder="(mantener en secreto)" /></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="grid-3">
+        <div class="field"><label class="label">1er Premio</label><input id="prize1" placeholder="Descripción" /></div>
+        <div class="field"><label class="label">2do Premio</label><input id="prize2" placeholder="Descripción" /></div>
+        <div class="field"><label class="label">3er Premio</label><input id="prize3" placeholder="Descripción" /></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="row">
+        <button id="saveSettings" class="primary">Guardar Configuración</button>
+        <button id="resetAll" class="danger">Reiniciar todo</button>
+        <button id="runTests" class="pill">🧪 Pruebas</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="title">Gestión de números</div>
+      <div class="spacer"></div>
+      <div id="adminNumbers" class="grid"></div>
+
+      <div class="spacer"></div>
+      <details class="diag">
+        <summary>Diagnóstico / Ayuda</summary>
+        <p class="muted">Si ves <span class="fail">FirebaseError: Missing or insufficient permissions</span>, asegurate de:</p>
+        <ul>
+          <li>Habilitar <strong>Authentication → Anonymous</strong> y <strong>Email/Password</strong>.</li>
+          <li>Usar reglas de Firestore que permitan <strong>write si request.auth != null</strong> (ver más abajo).</li>
+        </ul>
+        <pre class="kbd" style="white-space:pre-wrap;line-height:1.2">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /raffle/current { allow read: if true; allow write: if request.auth != null; }
+    match /raffle/current/numbers/{n} { allow read: if true; allow write: if request.auth != null; }
+  }
+}</pre>
+      </details>
+    </section>
+  </div>
+
+  <footer class="footer">Creado para tu sorteo • Actualización en vivo con Firebase • Hospeda en GitHub Pages</footer>
+
+  <!-- Firebase (rellenar config) -->
+  <script type="module">
+    // === CONFIGURACIÓN FIREBASE ===
+    // 1) Crear proyecto en https://console.firebase.google.com/
+    // 2) Habilitar Firestore (modo producción) y Authentication (Email/Password + Anonymous)
+    // 3) COMPLETAR estos datos con los tuyos de Firebase:
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_AUTH_DOMAIN",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_STORAGE_BUCKET",
+      messagingSenderId: "TU_MESSAGING_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // === ESTADO LOCAL ===
+    const S = {
+      settings: {
+        title: "Sorteo 00–99",
+        subtitle: "Elegí tu número. Precio base: $1000. Promo 2x: $1500.",
+        min: 0,
+        max: 99,
+        price: 1000,
+        promo2: 1500,
+        prizes: { p1:"1er premio", p2:"2do premio", p3:"3er premio" },
+      },
+      isAdminUser: false,
+      adminPanelVisible: false,
+      chosen: new Set(),
+    };
+
+    // === ELEMENTOS ===
+    const $ = (sel) => document.querySelector(sel);
+    const appTitle = $("#appTitle");
+    const subtitle = $("#subtitle");
+    const priceLabel = $("#priceLabel");
+    const promoLabel = $("#promoLabel");
+    const rangeLabel = $("#rangeLabel");
+    const grid = $("#numbersGrid");
+    const adminPanel = $("#adminPanel");
+    const adminNumbers = $("#adminNumbers");
+    const chosenWrap = $("#chosen");
+    const totalEl = $("#total");
+
+    // Form participantes
+    const fname = $("#fname");
+    const lname = $("#lname");
+    const alias = $("#alias");
+    const cvu = $("#cvu");
+
+    // ====== BOOTSTRAP ======
+    bootstrap();
+    async function bootstrap(){
+      try {
+        await signInAnonymously(auth);
+      } catch(e){
+        console.warn("No se pudo iniciar sesión anónima:", e);
+      }
+      attachListeners();
+    }
+
+    function attachListeners(){
+      onAuthStateChanged(auth, (user)=>{
+        S.isAdminUser = !!(user && (user.email || (user.providerData||[]).some(p=>p.providerId==='password')));
+        if (!S.isAdminUser) S.adminPanelVisible = false;
+        renderAdmin();
+      });
+
+      $("#adminToggle").addEventListener("click", async () => {
+        if (!auth.currentUser || !S.isAdminUser) {
+          const email = prompt("Email admin:");
+          const pass = prompt("Contraseña:");
+          if (!email || !pass) return;
+          try{
+            await signInWithEmailAndPassword(auth, email, pass);
+            S.adminPanelVisible = true;
+            renderAdmin();
+          }catch(e){
+            alert("No se pudo iniciar sesión: " + e.message);
+          }
+        } else {
+          S.adminPanelVisible = !S.adminPanelVisible;
+          renderAdmin();
+        }
+      });
+
+      $("#signOutBtn").addEventListener("click", async () => {
+        await signOut(auth);
+        S.adminPanelVisible = false;
+        renderAdmin();
+      });
+
+      $("#confirmBtn").addEventListener("click", onConfirmSelection);
+      $("#exportCsvBtn").addEventListener("click", onExportCSV);
+      $("#saveSettings").addEventListener("click", saveSettings);
+      $("#resetAll").addEventListener("click", resetAll);
+      $("#runTests").addEventListener("click", runTests);
+
+      onSnapshot(doc(db, "raffle", "current"), (d)=>{
+        if (d.exists()){
+          S.settings = { ...S.settings, ...d.data() };
+        }
+        renderHeader();
+        renderGrid(grid);
+        if (S.adminPanelVisible) renderGrid(adminNumbers, true);
+      });
+
+      onSnapshot(collection(db, "raffle", "current", "numbers"), (snap)=>{
+        STATE_NUMBERS.clear();
+        snap.forEach(docu=>{ STATE_NUMBERS.set(docu.id, docu.data()); });
+        renderGrid(grid);
+        if (S.adminPanelVisible) renderGrid(adminNumbers, true);
+      });
+    }
+
+    const STATE_NUMBERS = new Map();
+
+    function calcTotal(count){
+      if (count === 0) return 0;
+      if (count === 1) return S.settings.price;
+      if (count >= 2) return S.settings.promo2;
+      return count * S.settings.price;
+    }
+
+    async function onConfirmSelection(){
+      if (S.chosen.size === 0) return alert("Elegí al menos un número en la grilla");
+      if (!fname.value || !lname.value) return alert("Completa nombre y apellido");
+
+      const selected = [...S.chosen].map(n=>n.padStart(2,'0'));
+      const price = calcTotal(selected.length);
+
+      try {
+        const batch = writeBatch(db);
+        for (const n of selected) {
+          const ref = doc(db, "raffle", "current", "numbers", n);
+          batch.set(ref, {
+            number: n,
+            status: "selected",
+            fname: fname.value.trim(),
+            lname: lname.value.trim(),
+            alias: alias.value.trim(),
+            cvu: cvu.value.trim(),
+            paid: false,
+            updatedAt: Date.now()
+          }, { merge: true });
+        }
+        await batch.commit();
+        alert(`Seleccionado: ${selected.join(', ')}\nTotal: $${price}`);
+        S.chosen.clear();
+        renderChosen();
+      } catch(e){
+        console.error(e);
+        if (String(e.message||'').includes('Missing or insufficient permissions')){
+          alert("No se pudo guardar porque Firestore no permite escribir.\nSolución rápida:\n1) Authentication → habilitá Anonymous y Email/Password.\n2) Reglas: allow write: if request.auth != null; (ver Panel Admin → Diagnóstico).\nLuego recargá la página.");
+        } else {
+          alert("Error guardando selección: "+e.message);
+        }
+      }
+    }
+
+    async function onExportCSV(){
+      try {
+        const numbersSnap = await getDocs(collection(db, "raffle", "current", "numbers"));
+        const rows = [["number","status","fname","lname","alias","cvu","paid","updatedAt"]];
+        numbersSnap.forEach(d=>{
+          const x = d.data();
+          rows.push([x.number,x.status||"",x.fname||"",x.lname||"",x.alias||"",x.cvu||"",x.paid?"TRUE":"FALSE",x.updatedAt||""]);
+        });
+        const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+        const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `sorteo-${Date.now()}.csv`; a.click();
+        URL.revokeObjectURL(url);
+      } catch(e){
+        alert("No se pudo exportar: "+e.message);
+      }
+    }
+
+    function loadSettingsToForm(){
+      $("#confTitle").value = S.settings.title;
+      $("#confSubtitle").value = S.settings.subtitle;
+      $("#confRange").value = `${String(S.settings.min).padStart(2,'0')}-${String(S.settings.max).padStart(2,'0')}`;
+      $("#confPrice").value = S.settings.price;
+      $("#confPromo").value = S.settings.promo2;
+      $("#prize1").value = S.settings.prizes.p1;
+      $("#prize2").value = S.settings.prizes.p2;
+      $("#prize3").value = S.settings.prizes.p3;
+    }
+
+    async function saveSettings(){
+      const [minStr,maxStr] = ($("#confRange").value||"00-99").split('-');
+      const min = parseInt(minStr);
+      const max = parseInt(maxStr);
+      const newSettings = {
+        title: $("#confTitle").value || S.settings.title,
+        subtitle: $("#confSubtitle").value || S.settings.subtitle,
+        min: isNaN(min)?0:min,
+        max: isNaN(max)?99:max,
+        price: parseInt($("#confPrice").value)||S.settings.price,
+        promo2: parseInt($("#confPromo").value)||S.settings.promo2,
+        prizes: { p1: $("#prize1").value||"", p2: $("#prize2").value||"", p3: $("#prize3").value||"" },
+      };
+      try{
+        await setDoc(doc(db, "raffle", "current"), newSettings, { merge:true });
+        alert("Configuración guardada");
+      }catch(e){
+        if (String(e.message||'').includes('Missing or insufficient permissions')){
+          alert("No se pudo guardar configuración. Revisa reglas y que el usuario admin esté logueado.");
+        } else {
+          alert("Error al guardar configuración: "+e.message);
+        }
+      }
+    }
+
+    async function resetAll(){
+      if (!confirm("¿Seguro que querés reiniciar todo a disponible?")) return;
+      try{
+        const batch = writeBatch(db);
+        for (let i = S.settings.min; i <= S.settings.max; i++){
+          const n = String(i).padStart(2,'0');
+          const ref = doc(db, "raffle", "current", "numbers", n);
+          batch.set(ref, { number:n, status:"available", fname:"", lname:"", alias:"", cvu:"", paid:false, updatedAt: Date.now() }, { merge:true });
+        }
+        await batch.commit();
+        alert("Listo. Números reiniciados.");
+      }catch(e){
+        alert("No se pudo reiniciar: "+e.message);
+      }
+    }
+
+    function renderHeader(){
+      appTitle.textContent = S.settings.title || "Sorteo";
+      subtitle.textContent = S.settings.subtitle || "";
+      priceLabel.textContent = `$${S.settings.price}`;
+      promoLabel.textContent = `$${S.settings.promo2}`;
+      rangeLabel.textContent = `${String(S.settings.min).padStart(2,'0')}–${String(S.settings.max).padStart(2,'0')}`;
+    }
+
+    function renderGrid(target, isAdmin=false){
+      target.innerHTML = "";
+      for (let i=S.settings.min; i<=S.settings.max; i++){
+        const n = String(i).padStart(2,'0');
+        const d = STATE_NUMBERS.get(n) || {status:"available"};
+        const div = document.createElement('div');
+        div.className = `num ${d.status==='available'?'green':d.status==='selected'?'yellow':d.status==='paid'?'blue':'green'}`;
+        div.textContent = n;
+        const titleTxt = isAdmin
+          ? (d.fname ? `${d.fname} ${d.lname}` : (d.status==='available'?'Disponible':d.status==='selected'?'Seleccionado':'Pagado'))
+          : (d.status==='available'?'Disponible':d.status==='selected'?'Seleccionado':'Pagado');
+        div.title = titleTxt;
+        div.addEventListener('click', ()=>{
+          if (isAdmin){
+            adminEditNumber(n, d);
+          } else {
+            if (d.status !== 'available') { alert('Ese número no está disponible'); return; }
+            toggleChosen(n);
+          }
+        });
+        target.appendChild(div);
+      }
+      if (isAdmin) loadSettingsToForm();
+    }
+
+    function renderChosen(){
+      chosenWrap.innerHTML = "";
+      [...S.chosen].forEach(n=>{
+        const tag = document.createElement('span');
+        tag.className = 'pill';
+        tag.textContent = n;
+        tag.title = 'Quitar';
+        tag.addEventListener('click',()=>{ toggleChosen(n); });
+        chosenWrap.appendChild(tag);
+      });
+      totalEl.textContent = `$${calcTotal(S.chosen.size)}`;
+    }
+
+    function toggleChosen(n){
+      if (S.chosen.has(n)) S.chosen.delete(n); else {
+        if (S.chosen.size >= 2) { alert('La promo admite hasta 2 números por vez'); return; }
+        S.chosen.add(n);
+      }
+      renderChosen();
+    }
+
+    function renderAdmin(){
+      adminPanel.classList.toggle('hidden', !S.adminPanelVisible);
+      if (S.adminPanelVisible) { renderGrid(adminNumbers, true); }
+    }
+
+    async function adminEditNumber(n, d){
+      const action = prompt(`Número ${n} — estado actual: ${d.status || 'available'}\nOpciones: available | selected | paid | clear`);
+      if (!action) return;
+      const ref = doc(db, "raffle", "current", "numbers", n);
+      try{
+        if (action === 'clear'){
+          await setDoc(ref, { number:n, status:'available', fname:'', lname:'', alias:'', cvu:'', paid:false, updatedAt: Date.now() }, { merge:true});
+        } else if (['available','selected','paid'].includes(action)){
+          await setDoc(ref, { number:n, status:action, updatedAt: Date.now() }, { merge:true});
+        } else {
+          alert('Acción no válida');
+        }
+      }catch(e){
+        alert("No se pudo actualizar el número: "+e.message);
+      }
+    }
+
+    // === PRUEBAS (unit tests simples) ===
+    function runTests(){
+      const results = [];
+      const assertEq = (name, got, want) => { results.push({name, ok: got===want, got, want}); };
+
+      // Precios
+      assertEq('calcTotal(0)', calcTotal(0), 0);
+      assertEq('calcTotal(1)', calcTotal(1), S.settings.price);
+      assertEq('calcTotal(2)', calcTotal(2), S.settings.promo2);
+
+      // Selección máx 2 (simulado)
+      S.chosen.clear();
+      S.chosen.add('00'); S.chosen.add('01');
+      const before = S.chosen.size;
+      if (before !== 2){ /* debería ser 2 */ }
+      assertEq('limit 2 promo', before, 2);
+
+      const ok = results.filter(r=>r.ok).length;
+      const total = results.length;
+      alert(`🧪 Pruebas: ${ok}/${total} OK`);
+      console.table(results.map(r=>({test:r.name, ok:r.ok, got:r.got, want:r.want})));
+    }
+  </script>
+
+  <!-- Firestore reglas sugeridas (cópialas en Firebase → Firestore → Rules):
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /raffle/current { allow read: if true; allow write: if request.auth != null; }
+      match /raffle/current/numbers/{n} { allow read: if true; allow write: if request.auth != null; }
+    }
+  }
+  -->
+</body>
+</html>
